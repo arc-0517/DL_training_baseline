@@ -1,9 +1,0 @@
-{
-  "class_names": [
-    "cat",
-    "dog"
-  ],
-  "n_class": 2,
-  "model_name": "efficientnet_b0",
-  "img_size": 224
-}
