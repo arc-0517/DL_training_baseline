@@ -29,7 +29,8 @@ class TrainConfig(object):
         parents = [
             cls.base_parser(),
             cls.data_parser(),
-            cls.modeling_parser()
+            cls.modeling_parser(),
+            cls.inference_parser()  # 추가
         ]
 
         parser = argparse.ArgumentParser(add_help=True, parents=parents, fromfile_prefix_chars='@')
@@ -62,12 +63,11 @@ class TrainConfig(object):
 
     @property
     def checkpoint_dir(self) -> str:
-        # TODO: add if needed
         ckpt = os.path.join(
             self.checkpoint_root,
             f'dataset+{self.data_name}',
             f'model+{self.model_name}',
-            self.hash  # ...
+            self.hash
         )
 
         os.makedirs(ckpt, exist_ok=True)
@@ -96,28 +96,56 @@ class TrainConfig(object):
     def data_parser() -> argparse.ArgumentParser:
         """Returns an `argparse.ArgumentParser` instance containing data-related arguments."""
         parser = argparse.ArgumentParser("Data", add_help=False)
-        parser.add_argument('--data_dir', type=str, default='E:/keewon_code/DL_training_baseline/data')
-        # parser.add_argument('--data_dir', type=str, default='./data')
-        parser.add_argument('--data_name', type=str, default='dogcat', choices=['dogcat', 'santa'])
+        parser.add_argument('--data_dir', type=str, default='./data')
+        parser.add_argument('--data_name', type=str, default='dogcat', 
+                          choices=['dogcat', 'santa', 'skin'])
         parser.add_argument('--valid_ratio', type=float, default=0.2)
         parser.add_argument('--shuffle_dataset', type=bool, default=True)
-        parser.add_argument('--batch_size', type=int, default=512)
-        parser.add_argument('--test_batch_size', type=int, default=512)
+        parser.add_argument('--batch_size', type=int, default=32)
+        parser.add_argument('--test_batch_size', type=int, default=32)
+        parser.add_argument('--img_size', type=int, default=224)
 
         return parser
 
     @staticmethod
     def modeling_parser() -> argparse.ArgumentParser:
-
         parser = argparse.ArgumentParser("Modeling", add_help=False)
-        parser.add_argument('--model_name', type=str, default='resnet18')
-        parser.add_argument('--pre_trained', type=bool, default=True, choices=[True, False])
+        parser.add_argument('--model_name', type=str, default='resnet18',
+                          choices=['resnet18', 'resnet50', 'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2'])
+        parser.add_argument('--pre_trained', type=bool, default=True)
         parser.add_argument('--n_class', type=int, default=2)
         parser.add_argument('--loss_function', type=str, default="ce", choices=["ce", "mse"])
         parser.add_argument('--optimizer', type=str, default="adam", choices=["adam", "sgd", "adamW"])
         parser.add_argument('--scheduler', type=str, default="cosine")
         parser.add_argument('--lr_ae', type=float, default=1e-3)
-        parser.add_argument('--epochs', type=int, default=30)
+        parser.add_argument('--epochs', type=int, default=3)
         parser.add_argument('--local_rank', type=int, default=0)
 
         return parser
+
+    @staticmethod
+    def inference_parser() -> argparse.ArgumentParser:        
+        parser = argparse.ArgumentParser("Inference", add_help=False)
+        parser.add_argument('--inference_folder', type=str, default='./inference_folder')
+        parser.add_argument('--inference_output', type=str, default='./inference_results')
+        parser.add_argument('--model_path', type=str, default='')
+        parser.add_argument('--generate_gradcam', type=bool, default=True)
+        parser.add_argument('--class_names', type=str, nargs='+', default=['negative', 'positive'])
+        
+        return parser
+
+
+class InferenceConfig(object):    
+    def __init__(self, **kwargs):
+        # 기본값 설정
+        self.inference_folder = './inference_folder'
+        self.inference_output = './inference_results'
+        self.model_path = ''
+        self.generate_gradcam = True
+        self.class_names = ['negative', 'positive']
+        self.img_size = 224
+        self.batch_size = 16
+        
+        # kwargs로 덮어쓰기
+        for k, v in kwargs.items():
+            setattr(self, k, v)
