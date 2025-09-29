@@ -43,10 +43,7 @@ class Trainer(object):
         else:
             print("CUDA를 사용할 수 없습니다.")
             print("CPU 모드로 학습을 진행합니다.")
-            self.device = "cpu"
-
-        # 디바이스 정보 출력
-        print(f"🎯 사용 디바이스: {self.device}")
+            self.device = "cpu"        
 
         # 모델을 디바이스로 이동
         try:
