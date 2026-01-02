@@ -5,14 +5,24 @@ import torch.optim as optim
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score
 import pandas as pd
+import wandb
 
 class Trainer(object):
-    def __init__(self,
-                 model: nn.Module):
+    def __init__(self, model, config):
         super(Trainer, self).__init__()
-
         self.model = model
+        self.config = config
         self.compiled = False
+        self.early_stopping_patience = config.early_stopping_patience
+        self.early_stopping_counter = 0
+        self.best_score = None
+        self.early_stopping_metric = config.early_stopping_metric
+
+        if self.config.wandb:
+            wandb.init(project=self.config.wandb_project,
+                       name=self.config.wandb_run_name,
+                       config=vars(self.config))
+            wandb.watch(self.model)
 
     def compile(self,
                 ckpt_dir: str,
@@ -89,6 +99,8 @@ class Trainer(object):
         print(f"   학습률: {learnig_rate}")
         print(f"   에포크: {epochs}")
         print(f"   손실함수: {loss_function}")
+        print(f"   Early Stopping Patience: {self.early_stopping_patience}")
+        print(f"   Early Stopping Metric: {self.early_stopping_metric}")
 
     def train(self, epoch, data_loader):
 
@@ -117,6 +129,10 @@ class Trainer(object):
             device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
             train_bar.set_description('Train Epoch: [{}/{}] [{}], lr: {:.6f}, Loss: {:.4f}'.format(
                 epoch, self.epochs, device_info, self.get_lr(self.optimizer), total_loss / total_num))
+        
+        if self.config.wandb:
+            wandb.log({"train_loss": total_loss / total_num}, step=epoch)
+
         return total_loss / total_num
 
     @torch.no_grad()
@@ -124,6 +140,7 @@ class Trainer(object):
         pred_list, label_list = [], []
         self._set_learning_phase(False)  # 수정: True -> False (validation 모드)
         total_loss, total_num, valid_bar = 0.0, 0, tqdm(data_loader)
+        early_stop = False
 
         for inputs, targets in valid_bar:
             inputs = inputs.to(self.device)
@@ -143,7 +160,25 @@ class Trainer(object):
             device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
             valid_bar.set_description('Valid Epoch: [{}/{}] [{}], Loss: {:.4f}, Acc: {:.3f}'.format(
                 epoch, self.epochs, device_info, total_loss / total_num, valid_acc))
-        return total_loss / total_num, valid_acc
+        
+        if self.config.wandb:
+            wandb.log({"valid_loss": total_loss / total_num, "valid_acc": valid_acc}, step=epoch)
+
+        score = total_loss / total_num if self.early_stopping_metric == 'valid_loss' else valid_acc
+        if self.best_score is None:
+            self.best_score = score
+        elif score < self.best_score and self.early_stopping_metric == 'valid_loss':
+            self.best_score = score
+            self.early_stopping_counter = 0
+        elif score > self.best_score and self.early_stopping_metric == 'valid_acc':
+            self.best_score = score
+            self.early_stopping_counter = 0
+        else:
+            self.early_stopping_counter += 1
+            if self.early_stopping_counter >= self.early_stopping_patience:
+                early_stop = True
+
+        return total_loss / total_num, valid_acc, early_stop
 
     @torch.no_grad()
     def test(self, epoch, data_loader):
@@ -164,6 +199,10 @@ class Trainer(object):
             device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
             test_bar.set_description('Test Epoch: [{}/{}] [{}], ACC: {:.3f}'.format(
                 epoch, self.epochs, device_info, test_acc))
+
+        if self.config.wandb:
+            wandb.log({"test_acc": test_acc}, step=epoch)
+
         return test_acc
 
     def save(self, epoch, results):
@@ -172,11 +211,19 @@ class Trainer(object):
         data_frame.to_csv(self.ckpt_dir + '/log.csv', index_label='epoch')
         
         # 모델 저장 시 디바이스 정보도 함께 저장
+        model_path = self.ckpt_dir + '/model_last.pth'
         torch.save({'epoch': epoch,
                     'state_dict': self.model.state_dict(),
                     'optimizer': self.optimizer.state_dict(),
                     'device': self.device},  # 디바이스 정보 추가
-                    self.ckpt_dir + '/model_last.pth')
+                    model_path)
+
+        if self.config.wandb:
+            wandb.save(model_path)
+
+    def finish(self):
+        if self.config.wandb:
+            wandb.finish()
 
     def _set_learning_phase(self, train: bool = False):
         if train:

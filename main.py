@@ -30,12 +30,6 @@ def main():
     
     # config.save()
 
-    if config.wandb:
-        # wandb
-        wandb.init(project=f"DL_baseline_{config.data_name}", reinit=True)
-        wandb.run.name = f'model_{config.model_name}_pretrained_{config.pre_trained}'
-        wandb.save()
-
     # define data loader
     train_loader, valid_loader, test_loader = make_data_loaders(config)
     inputs, targets = next(iter(train_loader))
@@ -61,7 +55,7 @@ def main():
                         pre_trained=config.pre_trained,
                         n_class=config.n_class)
 
-    trainer = Trainer(model=model)
+    trainer = Trainer(model=model, config=config)
     trainer.compile(ckpt_dir=config.checkpoint_dir,
                     loss_function=config.loss_function,
                     optimizer=config.optimizer,
@@ -83,20 +77,12 @@ def main():
         train_loss = trainer.train(epoch, train_loader)
         results['train_loss'].append(train_loss)
 
-        valid_loss, valid_acc = trainer.valid(epoch, valid_loader)
+        valid_loss, valid_acc, early_stop = trainer.valid(epoch, valid_loader)
         results['valid_loss'].append(valid_loss)
         results['valid_acc'].append(valid_acc)
 
         test_acc = trainer.test(epoch, test_loader)
         results['test_acc'].append(test_acc)
-
-        if config.wandb:
-            wandb.log({
-                "Train Loss": train_loss,
-                "Valid Loss": valid_loss,
-                "Valid acc": valid_acc,
-                "Test acc": test_acc,
-            }, step=epoch)
 
         if valid_loss < best_loss:
             # save results
@@ -111,6 +97,12 @@ def main():
             
             with open(os.path.join(config.checkpoint_dir, 'class_info.json'), 'w') as f:
                 json.dump(class_info, f, indent=2)
+        
+        if early_stop:
+            print(f"Early stopping at epoch {epoch}")
+            break
+
+    trainer.finish()
 
     print(f"\nTraining completed!")
     print(f"Best model saved at: {os.path.join(config.checkpoint_dir, 'model_last.pth')}")

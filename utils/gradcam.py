@@ -13,8 +13,7 @@ class GradCAM:
         self.target_layer = target_layer
         self.gradients = None
         self.activations = None
-        
-        # Hook 등록 (새로운 방식으로 경고 해결)
+                
         self.forward_hook = self.target_layer.register_forward_hook(self.forward_hook_fn)
         self.backward_hook = self.target_layer.register_full_backward_hook(self.backward_hook_fn)
     
@@ -24,8 +23,7 @@ class GradCAM:
     def backward_hook_fn(self, module, grad_input, grad_output):
         self.gradients = grad_output[0]
     
-    def __del__(self):
-        """객체 소멸 시 hook 제거"""
+    def __del__(self):        
         if hasattr(self, 'forward_hook'):
             self.forward_hook.remove()
         if hasattr(self, 'backward_hook'):

@@ -73,6 +73,14 @@ class TrainConfig(object):
         os.makedirs(ckpt, exist_ok=True)
         return ckpt
 
+    @property
+    def wandb_run_name(self) -> str:
+        """Create a run name for wandb."""
+        run_name = ''
+        for tag in self.wandb_name_tags:
+            run_name += f'{tag}+{getattr(self, tag)}_'
+        return run_name[:-1]
+
     @staticmethod
     def convert_arg_line_to_args(arg_line):
         for arg in arg_line.split():
@@ -87,9 +95,9 @@ class TrainConfig(object):
         parser.add_argument('--random_state', type=int, default=0)
         parser.add_argument('--verbose', type=bool, default=True)
         parser.add_argument('--confusion_matrix', type=bool, default=True)
-        parser.add_argument('--wandb', type=bool, default=False)
-        parser.add_argument('--wandb_project', type=str, default='')
-        parser.add_argument('--wandb_run', type=str, default='')
+        parser.add_argument('--wandb', type=bool, default=True)
+        parser.add_argument('--wandb_project', type=str, default='dogcat_classification')
+        parser.add_argument('--wandb_name_tags', type=str, nargs='+', default=['model_name', 'optimizer'])
         return parser
 
     @staticmethod
@@ -98,7 +106,7 @@ class TrainConfig(object):
         parser = argparse.ArgumentParser("Data", add_help=False)
         parser.add_argument('--data_dir', type=str, default='./data')
         parser.add_argument('--data_name', type=str, default='dogcat', 
-                          choices=['dogcat', 'santa', 'skin'])
+                          choices=['dogcat'])
         parser.add_argument('--valid_ratio', type=float, default=0.2)
         parser.add_argument('--shuffle_dataset', type=bool, default=True)
         parser.add_argument('--batch_size', type=int, default=32)
@@ -118,8 +126,10 @@ class TrainConfig(object):
         parser.add_argument('--optimizer', type=str, default="adam", choices=["adam", "sgd", "adamW"])
         parser.add_argument('--scheduler', type=str, default="cosine")
         parser.add_argument('--lr_ae', type=float, default=1e-3)
-        parser.add_argument('--epochs', type=int, default=3)
+        parser.add_argument('--epochs', type=int, default=40)
         parser.add_argument('--local_rank', type=int, default=0)
+        parser.add_argument('--early_stopping_patience', type=int, default=10)
+        parser.add_argument('--early_stopping_metric', type=str, default='valid_loss')
 
         return parser
 
