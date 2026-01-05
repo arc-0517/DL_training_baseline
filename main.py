@@ -65,6 +65,7 @@ def main():
                     local_rank=config.local_rank)
 
     best_loss = np.inf
+    best_test_acc = 0.0
     epoch_start = 1
     results = {'train_loss': [],
                'valid_loss': [],
@@ -82,23 +83,31 @@ def main():
         results['valid_loss'].append(valid_loss)
         results['valid_acc'].append(valid_acc)
 
-        test_acc, cm = trainer.test(epoch, test_loader)
-        results['test_acc'].append(test_acc)
+        # Append the last best test accuracy by default.
+        # It will be updated if a new best model is found this epoch.
+        results['test_acc'].append(best_test_acc)
 
+        # test is performed only when validation loss improves
         if valid_loss < best_loss:
+            best_loss = valid_loss
+            
+            # run test
+            test_acc, cm = trainer.test(epoch, test_loader)
+            best_test_acc = test_acc # Update the running best
+            results['test_acc'][-1] = best_test_acc # Update this epoch's test accuracy
+
             # save results
             trainer.save(epoch, results, confusion_matrix=cm)
-            best_loss = valid_loss
             
             # 최고 성능 모델의 정보도 업데이트
             class_info['best_epoch'] = epoch
             class_info['best_valid_loss'] = best_loss
             class_info['best_valid_acc'] = valid_acc
-            class_info['best_test_acc'] = test_acc
+            class_info['best_test_acc'] = best_test_acc
             
             with open(os.path.join(config.checkpoint_dir, 'class_info.json'), 'w') as f:
                 json.dump(class_info, f, indent=2)
-        
+
         if early_stop:
             print(f"Early stopping at epoch {epoch}")
             break

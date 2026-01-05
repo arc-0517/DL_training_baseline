@@ -126,9 +126,6 @@ class Trainer(object):
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
-            if hasattr(self, 'scheduler'):
-                self.scheduler.step()
-
             total_num += data_loader.batch_size
             total_loss += loss.item() * data_loader.batch_size
             
@@ -141,6 +138,10 @@ class Trainer(object):
             wandb.log({"train_loss": total_loss / total_num}, step=epoch)
 
         return total_loss / total_num
+
+    def epoch_step(self):
+        if hasattr(self, 'scheduler'):
+            self.scheduler.step()
 
     @torch.no_grad()
     def valid(self, epoch, data_loader):

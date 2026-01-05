@@ -5,9 +5,9 @@ import sys
 MODELS = ["efficientnet_b0", "vit_b_16", "vit_tiny_patch16_224"]
 AUGMENTATION_TYPES = ["base", "color", "mixed", "randaugment"]
 LEARNING_RATE = 0.001
-EPOCHS = 50
+EPOCHS = 5
 DATA_NAME = "skin"
-WANDB_PROJECT = "skin_detection_experiments"
+WANDB_PROJECT = "skin_detection_experiments_v2"
 
 def main():
     """
