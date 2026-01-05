@@ -75,18 +75,19 @@ def main():
     for epoch in range(epoch_start, config.epochs+1):
         # train
         train_loss = trainer.train(epoch, train_loader)
+        trainer.epoch_step()
         results['train_loss'].append(train_loss)
 
         valid_loss, valid_acc, early_stop = trainer.valid(epoch, valid_loader)
         results['valid_loss'].append(valid_loss)
         results['valid_acc'].append(valid_acc)
 
-        test_acc = trainer.test(epoch, test_loader)
+        test_acc, cm = trainer.test(epoch, test_loader)
         results['test_acc'].append(test_acc)
 
         if valid_loss < best_loss:
             # save results
-            trainer.save(epoch, results)
+            trainer.save(epoch, results, confusion_matrix=cm)
             best_loss = valid_loss
             
             # 최고 성능 모델의 정보도 업데이트

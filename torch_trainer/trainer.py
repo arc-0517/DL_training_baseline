@@ -3,9 +3,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix
 import pandas as pd
 import wandb
+from torch.cuda.amp import GradScaler, autocast
 
 class Trainer(object):
     def __init__(self, model, config):
@@ -17,6 +18,7 @@ class Trainer(object):
         self.early_stopping_counter = 0
         self.best_score = None
         self.early_stopping_metric = config.early_stopping_metric
+        self.scaler = GradScaler(enabled=self.config.use_amp)
 
         if self.config.wandb:
             wandb.init(project=self.config.wandb_project,
@@ -24,7 +26,8 @@ class Trainer(object):
                        config=vars(self.config))
             wandb.watch(self.model)
 
-    def compile(self,
+    def compile(
+                self, 
                 ckpt_dir: str,
                 loss_function: str = 'ce',
                 optimizer: str = 'adam',
@@ -113,12 +116,16 @@ class Trainer(object):
         for inputs, targets in train_bar:
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
-            pred = self.model(inputs)
-            loss = self.loss_function(pred, targets)
+
+            with autocast(enabled=self.config.use_amp):
+                pred = self.model(inputs)
+                loss = self.loss_function(pred, targets)
 
             self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
+            self.scaler.scale(loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+
             if hasattr(self, 'scheduler'):
                 self.scheduler.step()
 
@@ -138,20 +145,22 @@ class Trainer(object):
     @torch.no_grad()
     def valid(self, epoch, data_loader):
         pred_list, label_list = [], []
-        self._set_learning_phase(False)  # 수정: True -> False (validation 모드)
+        self._set_learning_phase(False)
         total_loss, total_num, valid_bar = 0.0, 0, tqdm(data_loader)
         early_stop = False
 
         for inputs, targets in valid_bar:
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
-            pred = self.model(inputs)
+            
+            with autocast(enabled=self.config.use_amp):
+                pred = self.model(inputs)
+                loss = self.loss_function(pred, targets)
 
             _, predicted = torch.max(pred.data, 1)
             pred_list += predicted.tolist()
             label_list += targets.tolist()
 
-            loss = self.loss_function(pred, targets)
             valid_acc = accuracy_score(pred_list, label_list)
 
             total_num += data_loader.batch_size
@@ -185,11 +194,16 @@ class Trainer(object):
         pred_list, label_list = [], []
         self._set_learning_phase(False)
         test_bar = tqdm(data_loader)
+        
+        class_names = data_loader.dataset.classes if hasattr(data_loader.dataset, 'classes') else [str(i) for i in range(self.config.n_class)]
+
 
         for inputs, targets in test_bar:
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
-            pred = self.model(inputs)
+
+            with autocast(enabled=self.config.use_amp):
+                pred = self.model(inputs)
 
             _, predicted = torch.max(pred.data, 1)
             pred_list += predicted.tolist()
@@ -199,16 +213,27 @@ class Trainer(object):
             device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
             test_bar.set_description('Test Epoch: [{}/{}] [{}], ACC: {:.3f}'.format(
                 epoch, self.epochs, device_info, test_acc))
+        
+        cm = confusion_matrix(label_list, pred_list)
+        cm_df = pd.DataFrame(cm, index=class_names, columns=class_names)
+
 
         if self.config.wandb:
             wandb.log({"test_acc": test_acc}, step=epoch)
+            # Log the confusion matrix to wandb
+            wandb.log({"confusion_matrix": wandb.Table(dataframe=cm_df.reset_index())})
 
-        return test_acc
 
-    def save(self, epoch, results):
+        return test_acc, cm_df
+
+    def save(self, epoch, results, confusion_matrix=None):
         # save statistics
         data_frame = pd.DataFrame(data=results, index=range(1, epoch + 1))
         data_frame.to_csv(self.ckpt_dir + '/log.csv', index_label='epoch')
+
+        if confusion_matrix is not None:
+            confusion_matrix.to_csv(os.path.join(self.ckpt_dir, 'confusion_matrix_test.csv'))
+
         
         # 모델 저장 시 디바이스 정보도 함께 저장
         model_path = self.ckpt_dir + '/model_last.pth'
@@ -220,6 +245,9 @@ class Trainer(object):
 
         if self.config.wandb:
             wandb.save(model_path)
+            if confusion_matrix is not None:
+                wandb.save(os.path.join(self.ckpt_dir, 'confusion_matrix_test.csv'))
+
 
     def finish(self):
         if self.config.wandb:

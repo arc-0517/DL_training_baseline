@@ -1,5 +1,6 @@
 from torchvision import models
 import torch.nn as nn
+import timm
 
 def build_model(model_name: str, pre_trained: bool, n_class: int):
     
@@ -27,6 +28,9 @@ def build_model(model_name: str, pre_trained: bool, n_class: int):
             nn.Dropout(p=0.2),
             nn.Linear(model.classifier[1].in_features, n_class)
         )
+    elif model_name in ["vit_b_16", "vit_tiny_patch16_224"]:
+        model = timm.create_model(model_name, pretrained=pre_trained)
+        model.head = nn.Linear(model.head.in_features, n_class)
     else:
         raise ValueError(f"Unsupported model: {model_name}")
     
@@ -38,5 +42,7 @@ def get_gradcam_target_layer(model, model_name: str):
         return model.layer4[-1]  # ResNet의 마지막 conv layer
     elif model_name.startswith("efficientnet"):
         return model.features[-1]  # EfficientNet의 마지막 conv layer
+    elif model_name.startswith("vit"):
+        return model.blocks[-1].norm1 # ViT의 마지막 블록의 norm layer
     else:
         raise ValueError(f"Grad-CAM not supported for {model_name}")

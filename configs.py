@@ -105,13 +105,16 @@ class TrainConfig(object):
         """Returns an `argparse.ArgumentParser` instance containing data-related arguments."""
         parser = argparse.ArgumentParser("Data", add_help=False)
         parser.add_argument('--data_dir', type=str, default='./data')
-        parser.add_argument('--data_name', type=str, default='dogcat', 
-                          choices=['dogcat'])
+        parser.add_argument('--data_name', type=str, default='skin', 
+                          choices=['dogcat', 'skin'])
         parser.add_argument('--valid_ratio', type=float, default=0.2)
         parser.add_argument('--shuffle_dataset', type=bool, default=True)
-        parser.add_argument('--batch_size', type=int, default=32)
-        parser.add_argument('--test_batch_size', type=int, default=32)
+        parser.add_argument('--batch_size', type=int, default=64)
+        parser.add_argument('--test_batch_size', type=int, default=64)
         parser.add_argument('--img_size', type=int, default=224)
+        parser.add_argument('--augmentation_type', type=str, default='mixed',
+                          choices=['base', 'geometric', 'color', 'mixed', 'randaugment', 'autoaugment'])
+        parser.add_argument('--num_workers', type=int, default=min(os.cpu_count(), 4))
 
         return parser
 
@@ -119,17 +122,19 @@ class TrainConfig(object):
     def modeling_parser() -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser("Modeling", add_help=False)
         parser.add_argument('--model_name', type=str, default='resnet18',
-                          choices=['resnet18', 'resnet50', 'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2'])
+                          choices=['resnet18', 'resnet50', 'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2',
+                                   'vit_b_16', 'vit_tiny_patch16_224'])
         parser.add_argument('--pre_trained', type=bool, default=True)
-        parser.add_argument('--n_class', type=int, default=2)
+        parser.add_argument('--n_class', type=int, default=6)
         parser.add_argument('--loss_function', type=str, default="ce", choices=["ce", "mse"])
         parser.add_argument('--optimizer', type=str, default="adam", choices=["adam", "sgd", "adamW"])
         parser.add_argument('--scheduler', type=str, default="cosine")
         parser.add_argument('--lr_ae', type=float, default=1e-3)
-        parser.add_argument('--epochs', type=int, default=40)
+        parser.add_argument('--epochs', type=int, default=50)
         parser.add_argument('--local_rank', type=int, default=0)
         parser.add_argument('--early_stopping_patience', type=int, default=10)
         parser.add_argument('--early_stopping_metric', type=str, default='valid_loss')
+        parser.add_argument('--use_amp', type=bool, default=True)
 
         return parser
 
@@ -140,7 +145,7 @@ class TrainConfig(object):
         parser.add_argument('--inference_output', type=str, default='./inference_results')
         parser.add_argument('--model_path', type=str, default='')
         parser.add_argument('--generate_gradcam', type=bool, default=True)
-        parser.add_argument('--class_names', type=str, nargs='+', default=['negative', 'positive'])
+        parser.add_argument('--class_names', type=str, nargs='+', default=[f'class_{i}' for i in range(6)])
         
         return parser
 
