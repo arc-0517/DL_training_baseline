@@ -9,5 +9,6 @@ Pillow>=8.2.0
 opencv-python>=4.5.0
 numpy>=1.21.0
 kaggle>=1.5.12
-wandb >=0.23.1timm
+wandb >=0.23.1
+timm
 pandas
