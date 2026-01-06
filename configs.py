@@ -54,12 +54,15 @@ class TrainConfig(object):
         if path is None:
             path = os.path.join(self.checkpoint_dir, 'configs.json')
         os.makedirs(os.path.dirname(path), exist_ok=True)
-
+        
         attrs = copy.deepcopy(vars(self))
+        # 'Namespace' object is not json serializable.
+        attrs.pop('__initial_args', None)
         attrs['checkpoint_dir'] = self.checkpoint_dir
 
-        with open(path, 'w') as f:
-            json.dump(attrs, f, indent=2)
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(attrs, f, indent=2, ensure_ascii=False)
+
 
     @property
     def checkpoint_dir(self) -> str:
@@ -109,7 +112,7 @@ class TrainConfig(object):
                           choices=['dogcat', 'skin'])
         parser.add_argument('--valid_ratio', type=float, default=0.2)
         parser.add_argument('--shuffle_dataset', type=bool, default=True)
-        parser.add_argument('--batch_size', type=int, default=64)
+        parser.add_argument('--batch_size', type=int, default=128)
         parser.add_argument('--test_batch_size', type=int, default=64)
         parser.add_argument('--img_size', type=int, default=224)
         parser.add_argument('--augmentation_type', type=str, default='mixed',
@@ -127,14 +130,28 @@ class TrainConfig(object):
         parser.add_argument('--pre_trained', type=bool, default=True)
         parser.add_argument('--n_class', type=int, default=6)
         parser.add_argument('--loss_function', type=str, default="ce", choices=["ce", "mse"])
-        parser.add_argument('--optimizer', type=str, default="adam", choices=["adam", "sgd", "adamW"])
-        parser.add_argument('--scheduler', type=str, default="cosine")
+        parser.add_argument('--optimizer', type=str, default="adamW", choices=["adam", "sgd", "adamW"])
+        parser.add_argument('--scheduler', type=str, default="cosine", choices=["cosine", "none"])
         parser.add_argument('--lr_ae', type=float, default=1e-3)
+        parser.add_argument('--weight_decay', type=float, default=1e-4)
         parser.add_argument('--epochs', type=int, default=50)
         parser.add_argument('--local_rank', type=int, default=0)
         parser.add_argument('--early_stopping_patience', type=int, default=10)
         parser.add_argument('--early_stopping_metric', type=str, default='valid_loss')
         parser.add_argument('--use_amp', type=bool, default=True)
+        
+        # Mixup and Focal Loss
+        parser.add_argument('--use_focal_loss', type=bool, default=True)
+        parser.add_argument('--focal_loss_gamma', type=float, default=2.0)
+        parser.add_argument('--use_mixup', type=bool, default=True)
+        parser.add_argument('--mixup_alpha', type=float, default=0.4)
+        
+        # Warm-up
+        parser.add_argument('--use_warmup', type=bool, default=True)
+        parser.add_argument('--warmup_epochs', type=int, default=5)
+
+        # Label Smoothing
+        parser.add_argument('--label_smoothing', type=float, default=0.1)
 
         return parser
 

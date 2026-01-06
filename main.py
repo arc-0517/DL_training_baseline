@@ -34,21 +34,20 @@ def main():
     train_loader, valid_loader, test_loader = make_data_loaders(config)
     inputs, targets = next(iter(train_loader))
     
-    # 클래스 이름 추출 및 저장
+    # 클래스 이름 추출
     class_names = train_loader.dataset.get_class_names()
     print(f"Classes: {class_names}")
     
-    # 클래스 정보를 체크포인트 폴더에 저장
-    class_info = {
-        'class_names': class_names,
-        'n_class': len(class_names),
-        'model_name': config.model_name,
-        'img_size': config.img_size
-    }
+    # config의 모든 파라미터를 class_info.json에 저장하기 위해 딕셔너리로 변환
+    class_info = vars(config)
+    # 추가 정보 저장
+    class_info['class_names'] = class_names
+    class_info['n_class'] = len(class_names)
     
     os.makedirs(config.checkpoint_dir, exist_ok=True)
+    # 초기 파라미터 저장
     with open(os.path.join(config.checkpoint_dir, 'class_info.json'), 'w') as f:
-        json.dump(class_info, f, indent=2)
+        json.dump(class_info, f, indent=2, ensure_ascii=False)
 
     # Define model & trainer
     model = build_model(model_name=config.model_name,

@@ -7,6 +7,32 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 import pandas as pd
 import wandb
 from torch.cuda.amp import GradScaler, autocast
+import numpy as np
+import torch.nn.functional as F
+
+from utils.losses import FocalLoss
+
+def mixup_data(x, y, alpha=1.0, use_cuda=True):
+    '''Returns mixed inputs, pairs of targets, and lambda'''
+    if alpha > 0:
+        lam = np.random.beta(alpha, alpha)
+    else:
+        lam = 1
+
+    batch_size = x.size()[0]
+    if use_cuda:
+        index = torch.randperm(batch_size).cuda()
+    else:
+        index = torch.randperm(batch_size)
+
+    mixed_x = lam * x + (1 - lam) * x[index, :]
+    y_a, y_b = y, y[index]
+    return mixed_x, y_a, y_b, lam
+
+
+def mixup_criterion(criterion, pred, y_a, y_b, lam):
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+
 
 class Trainer(object):
     def __init__(self, model, config):
@@ -27,13 +53,13 @@ class Trainer(object):
             wandb.watch(self.model)
 
     def compile(
-                self, 
+                self,
                 ckpt_dir: str,
                 loss_function: str = 'ce',
-                optimizer: str = 'adam',
+                optimizer: str = 'adamW',
                 scheduler: str = 'cosine',
-                learnig_rate: float = 1e-4,
-                epochs: int = 300,
+                learnig_rate: float = 1e-3,
+                epochs: int = 50,
                 local_rank: int = 0):
 
         self.ckpt_dir = ckpt_dir
@@ -41,81 +67,82 @@ class Trainer(object):
 
         self.epochs = epochs
         
-        # CUDA 사용 가능 여부 확인 및 디바이스 설정
         if torch.cuda.is_available():
             try:
                 self.device = f"cuda:{local_rank}"
-                # 실제로 CUDA 디바이스가 작동하는지 테스트
                 test_tensor = torch.tensor([1.0]).to(self.device)
                 print(f"CUDA 사용 가능: {self.device}")
                 print(f"GPU: {torch.cuda.get_device_name(local_rank)}")
             except Exception as e:
                 print(f"CUDA 초기화 실패: {e}")
-                print("CPU 모드로 전환합니다.")
                 self.device = "cpu"
         else:
-            print("CUDA를 사용할 수 없습니다.")
-            print("CPU 모드로 학습을 진행합니다.")
-            self.device = "cpu"        
-
-        # 모델을 디바이스로 이동
-        try:
-            self.model.to(self.device)
-            print("모델이 디바이스로 성공적으로 이동되었습니다.")
-        except Exception as e:
-            print(f"모델 디바이스 이동 실패: {e}")
-            # CPU로 강제 설정
             self.device = "cpu"
-            self.model.to(self.device)
-            print("강제로 CPU 모드로 전환했습니다.")
+        
+        if self.device == 'cpu':
+            print("CPU 모드로 학습을 진행합니다.")
 
-        # Define Optimizer
+        self.model.to(self.device)
+        print("모델이 디바이스로 성공적으로 이동되었습니다.")
+
+        # Optimizer with new weight_decay
         if optimizer == 'adam':
-            self.optimizer = optim.Adam(params=self.model.parameters(),
-                                        lr=learnig_rate, weight_decay=1e-5)
+            self.optimizer = optim.Adam(params=self.model.parameters(), lr=learnig_rate, weight_decay=self.config.weight_decay)
         elif optimizer == 'sgd':
-            self.optimizer = optim.SGD(params=self.model.parameters(),
-                                        lr=learnig_rate, weight_decay=1e-5)
+            self.optimizer = optim.SGD(params=self.model.parameters(), lr=learnig_rate, weight_decay=self.config.weight_decay)
         elif optimizer == 'adamW':
-            self.optimizer = optim.AdamW(params=self.model.parameters(),
-                                        lr=learnig_rate, weight_decay=1e-5)
+            self.optimizer = optim.AdamW(params=self.model.parameters(), lr=learnig_rate, weight_decay=self.config.weight_decay)
         else:
             raise ValueError('Provide a proper optimizer name')
 
+        # Scheduler with Warm-up
         if scheduler == 'cosine':
-            self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epochs, eta_min=0.0001)
-
-        # Define Loss function
-        if loss_function == "ce":
-            self.loss_function = nn.CrossEntropyLoss()
-        elif loss_function == "mse":
-            self.loss_function = nn.MSELoss()
+            if self.config.use_warmup:
+                print(f"Using Warm-up for {self.config.warmup_epochs} epochs.")
+                main_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epochs - self.config.warmup_epochs, eta_min=1e-5)
+                warmup_scheduler = torch.optim.lr_scheduler.LinearLR(self.optimizer, start_factor=0.01, total_iters=self.config.warmup_epochs)
+                self.scheduler = torch.optim.lr_scheduler.SequentialLR(self.optimizer, schedulers=[warmup_scheduler, main_scheduler], milestones=[self.config.warmup_epochs])
+            else:
+                self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.epochs, eta_min=1e-5)
         else:
-            raise ValueError('Provide a proper loss function name')
+            self.scheduler = None
+
+        # Loss function selection with Focal Loss
+        if self.config.use_focal_loss:
+            print(f"Using Focal Loss (gamma={self.config.focal_loss_gamma})")
+            self.loss_function = FocalLoss(gamma=self.config.focal_loss_gamma)
+        else:
+            print(f"Using Cross Entropy Loss (label_smoothing={self.config.label_smoothing})")
+            self.loss_function = nn.CrossEntropyLoss(label_smoothing=self.config.label_smoothing)
 
         self.compiled = True
         
-        # 학습 환경 정보 출력
         print(f"\n 학습 환경 설정 완료:")
         print(f"   디바이스: {self.device}")
         print(f"   옵티마이저: {optimizer}")
         print(f"   학습률: {learnig_rate}")
+        print(f"   Weight Decay: {self.config.weight_decay}")
         print(f"   에포크: {epochs}")
-        print(f"   손실함수: {loss_function}")
-        print(f"   Early Stopping Patience: {self.early_stopping_patience}")
-        print(f"   Early Stopping Metric: {self.early_stopping_metric}")
+        print(f"   손실함수: {'Focal Loss (gamma=' + str(self.config.focal_loss_gamma) + ')' if self.config.use_focal_loss else 'Cross Entropy (label_smoothing=' + str(self.config.label_smoothing) + ')'}")
+        print(f"   Mixup 사용: {'Yes (alpha=' + str(self.config.mixup_alpha) + ')' if self.config.use_mixup else 'No'}")
+        print(f"   Scheduler: {'Cosine with Warm-up (eta_min=1e-5)' if self.config.use_warmup and self.scheduler else 'Cosine (eta_min=1e-5)' if self.scheduler else 'None'}")
+
 
     def train(self, epoch, data_loader):
-
         if not self.compiled:
             raise RuntimeError('Training not prepared')
-
+        
         self._set_learning_phase(True)
-        total_loss, total_num, train_bar = 0.0, 0, tqdm(data_loader)
+        
+        if self.config.use_mixup:
+            return self._train_mixup_epoch(epoch, data_loader)
+        else:
+            return self._train_standard_epoch(epoch, data_loader)
 
+    def _train_standard_epoch(self, epoch, data_loader):
+        total_loss, total_num, train_bar = 0.0, 0, tqdm(data_loader)
         for inputs, targets in train_bar:
-            inputs = inputs.to(self.device)
-            targets = targets.to(self.device)
+            inputs, targets = inputs.to(self.device), targets.to(self.device)
 
             with autocast(enabled=self.config.use_amp):
                 pred = self.model(inputs)
@@ -129,18 +156,41 @@ class Trainer(object):
             total_num += data_loader.batch_size
             total_loss += loss.item() * data_loader.batch_size
             
-            # CPU 사용 시에는 더 자세한 진행 상황 표시
             device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
-            train_bar.set_description('Train Epoch: [{}/{}] [{}], lr: {:.6f}, Loss: {:.4f}'.format(
-                epoch, self.epochs, device_info, self.get_lr(self.optimizer), total_loss / total_num))
+            train_bar.set_description(f'Train Epoch (Standard): [{epoch}/{self.epochs}] [{device_info}], lr: {self.get_lr(self.optimizer):.6f}, Loss: {total_loss / total_num:.4f}')
         
         if self.config.wandb:
             wandb.log({"train_loss": total_loss / total_num}, step=epoch)
+        return total_loss / total_num
 
+    def _train_mixup_epoch(self, epoch, data_loader):
+        total_loss, total_num, train_bar = 0.0, 0, tqdm(data_loader)
+        for inputs, targets in train_bar:
+            inputs, targets = inputs.to(self.device), targets.to(self.device)
+
+            mixed_inputs, targets_a, targets_b, lam = mixup_data(inputs, targets, self.config.mixup_alpha, use_cuda=self.device.startswith('cuda'))
+
+            with autocast(enabled=self.config.use_amp):
+                pred = self.model(mixed_inputs)
+                loss = mixup_criterion(self.loss_function, pred, targets_a, targets_b, lam)
+
+            self.optimizer.zero_grad()
+            self.scaler.scale(loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+
+            total_num += data_loader.batch_size
+            total_loss += loss.item() * data_loader.batch_size
+
+            device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
+            train_bar.set_description(f'Train Epoch (Mixup): [{epoch}/{self.epochs}] [{device_info}], lr: {self.get_lr(self.optimizer):.6f}, Loss: {total_loss / total_num:.4f}')
+
+        if self.config.wandb:
+            wandb.log({"train_loss": total_loss / total_num}, step=epoch)
         return total_loss / total_num
 
     def epoch_step(self):
-        if hasattr(self, 'scheduler'):
+        if self.scheduler:
             self.scheduler.step()
 
     @torch.no_grad()
@@ -151,43 +201,30 @@ class Trainer(object):
         early_stop = False
 
         for inputs, targets in valid_bar:
-            inputs = inputs.to(self.device)
-            targets = targets.to(self.device)
-            
+            inputs, targets = inputs.to(self.device), targets.to(self.device)
             with autocast(enabled=self.config.use_amp):
                 pred = self.model(inputs)
                 loss = self.loss_function(pred, targets)
-
             _, predicted = torch.max(pred.data, 1)
-            pred_list += predicted.tolist()
-            label_list += targets.tolist()
-
-            valid_acc = accuracy_score(pred_list, label_list)
-
+            pred_list.extend(predicted.cpu().numpy())
+            label_list.extend(targets.cpu().numpy())
             total_num += data_loader.batch_size
             total_loss += loss.item() * data_loader.batch_size
-            
+            valid_acc = accuracy_score(label_list, pred_list)
             device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
-            valid_bar.set_description('Valid Epoch: [{}/{}] [{}], Loss: {:.4f}, Acc: {:.3f}'.format(
-                epoch, self.epochs, device_info, total_loss / total_num, valid_acc))
+            valid_bar.set_description(f'Valid Epoch: [{epoch}/{self.epochs}] [{device_info}], Loss: {total_loss / total_num:.4f}, Acc: {valid_acc:.3f}')
         
         if self.config.wandb:
             wandb.log({"valid_loss": total_loss / total_num, "valid_acc": valid_acc}, step=epoch)
 
         score = total_loss / total_num if self.early_stopping_metric == 'valid_loss' else valid_acc
-        if self.best_score is None:
-            self.best_score = score
-        elif score < self.best_score and self.early_stopping_metric == 'valid_loss':
-            self.best_score = score
-            self.early_stopping_counter = 0
-        elif score > self.best_score and self.early_stopping_metric == 'valid_acc':
+        if self.best_score is None or (score < self.best_score and self.early_stopping_metric == 'valid_loss') or (score > self.best_score and self.early_stopping_metric == 'valid_acc'):
             self.best_score = score
             self.early_stopping_counter = 0
         else:
             self.early_stopping_counter += 1
             if self.early_stopping_counter >= self.early_stopping_patience:
                 early_stop = True
-
         return total_loss / total_num, valid_acc, early_stop
 
     @torch.no_grad()
@@ -195,70 +232,48 @@ class Trainer(object):
         pred_list, label_list = [], []
         self._set_learning_phase(False)
         test_bar = tqdm(data_loader)
-        
         class_names = data_loader.dataset.classes if hasattr(data_loader.dataset, 'classes') else [str(i) for i in range(self.config.n_class)]
 
-
         for inputs, targets in test_bar:
-            inputs = inputs.to(self.device)
-            targets = targets.to(self.device)
-
+            inputs, targets = inputs.to(self.device), targets.to(self.device)
             with autocast(enabled=self.config.use_amp):
                 pred = self.model(inputs)
-
             _, predicted = torch.max(pred.data, 1)
-            pred_list += predicted.tolist()
-            label_list += targets.tolist()
-
-            test_acc = accuracy_score(pred_list, label_list)
+            pred_list.extend(predicted.cpu().numpy())
+            label_list.extend(targets.cpu().numpy())
+            test_acc = accuracy_score(label_list, pred_list)
             device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
-            test_bar.set_description('Test Epoch: [{}/{}] [{}], ACC: {:.3f}'.format(
-                epoch, self.epochs, device_info, test_acc))
+            test_bar.set_description(f'Test Epoch: [{epoch}/{self.epochs}] [{device_info}], ACC: {test_acc:.3f}')
         
         cm = confusion_matrix(label_list, pred_list)
         cm_df = pd.DataFrame(cm, index=class_names, columns=class_names)
 
-
         if self.config.wandb:
             wandb.log({"test_acc": test_acc}, step=epoch)
-            # Log the confusion matrix to wandb
             wandb.log({"confusion_matrix": wandb.Table(dataframe=cm_df.reset_index())})
-
 
         return test_acc, cm_df
 
     def save(self, epoch, results, confusion_matrix=None):
-        # save statistics
         data_frame = pd.DataFrame(data=results, index=range(1, epoch + 1))
-        data_frame.to_csv(self.ckpt_dir + '/log.csv', index_label='epoch')
-
+        data_frame.to_csv(os.path.join(self.ckpt_dir, 'log.csv'), index_label='epoch')
         if confusion_matrix is not None:
             confusion_matrix.to_csv(os.path.join(self.ckpt_dir, 'confusion_matrix_test.csv'))
-
         
-        # 모델 저장 시 디바이스 정보도 함께 저장
-        model_path = self.ckpt_dir + '/model_last.pth'
-        torch.save({'epoch': epoch,
-                    'state_dict': self.model.state_dict(),
-                    'optimizer': self.optimizer.state_dict(),
-                    'device': self.device},  # 디바이스 정보 추가
-                    model_path)
+        model_path = os.path.join(self.ckpt_dir, 'model_last.pth')
+        torch.save({'epoch': epoch, 'state_dict': self.model.state_dict(), 'optimizer': self.optimizer.state_dict(), 'device': self.device}, model_path)
 
         if self.config.wandb:
             wandb.save(model_path)
             if confusion_matrix is not None:
                 wandb.save(os.path.join(self.ckpt_dir, 'confusion_matrix_test.csv'))
 
-
     def finish(self):
         if self.config.wandb:
             wandb.finish()
 
     def _set_learning_phase(self, train: bool = False):
-        if train:
-            self.model.train()
-        else:
-            self.model.eval()
+        self.model.train(train)
 
     def get_lr(self, optimizer):
         for param_group in optimizer.param_groups:

@@ -1,52 +1,79 @@
 import subprocess
 import sys
+import itertools
 
-# 실험 설정
-MODELS = ["efficientnet_b0", "vit_b_16", "vit_tiny_patch16_224"]
-AUGMENTATION_TYPES = ["base", "color", "mixed", "randaugment"]
+# 1. 모델 설정
+MODEL = "efficientnet_b0"
+
+# 2. 배치 사이즈 고정
+BATCH_SIZE = 64
+
+# 3. Augmentation 설정
+# 'base'는 기본으로 포함하고, 성능이 가장 좋았던 증강 기법을 아래 리스트에 추가하세요.
+# 예: 'randaugment'가 가장 좋았다면 ['base', 'randaugment']
+BEST_AUGMENTATION = 'mixed'  # <-- 이 부분을 가장 성능이 좋았던 augmentation 이름으로 변경하세요.
+AUGMENTATION_TYPES = ['base', BEST_AUGMENTATION]
+
+# 4. Mixup 적용 여부
+MIXUP_OPTIONS = [True, False]
+
+# 5. Loss 함수 선택 (Focal Loss 사용 여부)
+FOCAL_LOSS_OPTIONS = [True, False]
+
+# 6. 기타 설정
 LEARNING_RATE = 0.001
-EPOCHS = 5
+EPOCHS = 2
 DATA_NAME = "skin"
-WANDB_PROJECT = "skin_detection_experiments_v2"
+WANDB_PROJECT = "skin_exp_efficientnet_b0_test"
+
+# --- 스크립트 본체 ---
 
 def main():
     """
-    지정된 모델과 증강 유형에 대해 main.py를 실행하여 반복 실험을 수행합니다.
+    지정된 설정의 모든 조합에 대해 main.py를 실행하여 반복 실험을 수행합니다.
     """
-    for model in MODELS:
-        for aug_type in AUGMENTATION_TYPES:
-            print(f"Running experiment with model: {model} and augmentation: {aug_type}")
-            
-            # wandb 실행 이름 설정 (예: model_efficientnet_b0_aug_base)
-            wandb_run_name = f"model_{model}_aug_{aug_type}"
+    # itertools.product를 사용하여 모든 경우의 수 조합을 생성
+    experiment_cases = list(itertools.product(AUGMENTATION_TYPES, MIXUP_OPTIONS, FOCAL_LOSS_OPTIONS))
+    total_experiments = len(experiment_cases)
+    print(f"Total experiments to run: {total_experiments}")
+    print("---")
 
-            command = [
-                sys.executable,  # 현재 파이썬 인터프리터 사용
-                "main.py",
-                "--data_name", DATA_NAME,
-                "--model_name", model,
-                "--lr_ae", str(LEARNING_RATE),
-                "--augmentation_type", aug_type,
-                "--epochs", str(EPOCHS),
-                "--wandb_project", WANDB_PROJECT,
-                # wandb 실행 이름 태그를 동적으로 설정
-                "--wandb_name_tags", "model_name", "augmentation_type"
-            ]
-            
-            try:
-                # main.py 실행
-                subprocess.run(command, check=True)
-                print(f"Successfully completed experiment with model: {model} and augmentation: {aug_type}")
-            except subprocess.CalledProcessError as e:
-                print(f"Error running experiment with model: {model} and augmentation: {aug_type}")
-                print(f"Command: {' '.join(command)}")
-                print(f"Return code: {e.returncode}")
-                # Stderr와 Stdout은 check=True일 때 자동으로 출력됩니다.
-                # 오류 발생 시 다음 실험으로 넘어가지 않고 중단합니다.
-                sys.exit(1)
-            except FileNotFoundError:
-                print(f"Error: main.py not found. Make sure you are in the correct directory.")
-                sys.exit(1)
+    for i, (aug_type, use_mixup, use_focal_loss) in enumerate(experiment_cases):
+        
+        print(f"Running experiment {i+1}/{total_experiments}:")
+        print(f"  - Model: {MODEL}")
+        print(f"  - Augmentation: {aug_type}")
+        print(f"  - Use Mixup: {use_mixup}")
+        print(f"  - Use Focal Loss: {use_focal_loss}")
+        print(f"  - Batch Size: {BATCH_SIZE}")
+        print("---")
+
+        command = [
+            sys.executable,
+            "main.py",
+            "--data_name", DATA_NAME,
+            "--model_name", MODEL,
+            "--lr_ae", str(LEARNING_RATE),
+            "--epochs", str(EPOCHS),
+            "--wandb_project", WANDB_PROJECT,
+            "--batch_size", str(BATCH_SIZE),
+            "--augmentation_type", aug_type,
+            "--use_mixup", str(use_mixup),
+            "--use_focal_loss", str(use_focal_loss),
+            "--wandb_name_tags", "model_name", "augmentation_type", "use_mixup", "use_focal_loss"
+        ]
+        
+        try:
+            subprocess.run(command, check=True)
+            print(f"--- Successfully completed experiment {i+1}/{total_experiments} ---")
+        except subprocess.CalledProcessError as e:
+            print(f"!!! Error running experiment {i+1}/{total_experiments} !!!")
+            print(f"Command: {' '.join(command)}")
+            print(f"Return code: {e.returncode}")
+            sys.exit(1) # 오류 발생 시 스크립트 중단
+        except FileNotFoundError:
+            print(f"Error: main.py not found. Make sure you are in the correct directory.")
+            sys.exit(1)
 
     print("All experiments completed.")
 
