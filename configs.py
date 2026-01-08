@@ -92,13 +92,25 @@ class TrainConfig(object):
             yield arg
 
     @staticmethod
+    def str2bool(v):
+        """Convert string to boolean for argparse."""
+        if isinstance(v, bool):
+            return v
+        if v.lower() in ('yes', 'true', 't', 'y', '1'):
+            return True
+        elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+            return False
+        else:
+            raise argparse.ArgumentTypeError('Boolean value expected.')
+
+    @staticmethod
     def base_parser() -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser("Base", add_help=False)
         parser.add_argument('--checkpoint_root', type=str, default='./save_results')
         parser.add_argument('--random_state', type=int, default=0)
-        parser.add_argument('--verbose', type=bool, default=True)
-        parser.add_argument('--confusion_matrix', type=bool, default=True)
-        parser.add_argument('--wandb', type=bool, default=True)
+        parser.add_argument('--verbose', type=TrainConfig.str2bool, default=True)
+        parser.add_argument('--confusion_matrix', type=TrainConfig.str2bool, default=True)
+        parser.add_argument('--wandb', type=TrainConfig.str2bool, default=True)
         parser.add_argument('--wandb_project', type=str, default='dogcat_classification')
         parser.add_argument('--wandb_name_tags', type=str, nargs='+', default=['model_name', 'optimizer'])
         return parser
@@ -108,10 +120,10 @@ class TrainConfig(object):
         """Returns an `argparse.ArgumentParser` instance containing data-related arguments."""
         parser = argparse.ArgumentParser("Data", add_help=False)
         parser.add_argument('--data_dir', type=str, default='./data')
-        parser.add_argument('--data_name', type=str, default='skin', 
+        parser.add_argument('--data_name', type=str, default='skin',
                           choices=['dogcat', 'skin'])
         parser.add_argument('--valid_ratio', type=float, default=0.2)
-        parser.add_argument('--shuffle_dataset', type=bool, default=True)
+        parser.add_argument('--shuffle_dataset', type=TrainConfig.str2bool, default=True)
         parser.add_argument('--batch_size', type=int, default=128)
         parser.add_argument('--test_batch_size', type=int, default=64)
         parser.add_argument('--img_size', type=int, default=224)
@@ -127,7 +139,7 @@ class TrainConfig(object):
         parser.add_argument('--model_name', type=str, default='resnet18',
                           choices=['resnet18', 'resnet50', 'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2',
                                    'vit_b_16', 'vit_tiny_patch16_224'])
-        parser.add_argument('--pre_trained', type=bool, default=True)
+        parser.add_argument('--pre_trained', type=TrainConfig.str2bool, default=True)
         parser.add_argument('--n_class', type=int, default=6)
         parser.add_argument('--loss_function', type=str, default="ce", choices=["ce", "mse"])
         parser.add_argument('--optimizer', type=str, default="adamW", choices=["adam", "sgd", "adamW"])
@@ -138,16 +150,16 @@ class TrainConfig(object):
         parser.add_argument('--local_rank', type=int, default=0)
         parser.add_argument('--early_stopping_patience', type=int, default=10)
         parser.add_argument('--early_stopping_metric', type=str, default='valid_loss')
-        parser.add_argument('--use_amp', type=bool, default=True)
-        
+        parser.add_argument('--use_amp', type=TrainConfig.str2bool, default=True)
+
         # Mixup and Focal Loss
-        parser.add_argument('--use_focal_loss', type=bool, default=True)
+        parser.add_argument('--use_focal_loss', type=TrainConfig.str2bool, default=True)
         parser.add_argument('--focal_loss_gamma', type=float, default=2.0)
-        parser.add_argument('--use_mixup', type=bool, default=True)
+        parser.add_argument('--use_mixup', type=TrainConfig.str2bool, default=True)
         parser.add_argument('--mixup_alpha', type=float, default=0.4)
-        
+
         # Warm-up
-        parser.add_argument('--use_warmup', type=bool, default=True)
+        parser.add_argument('--use_warmup', type=TrainConfig.str2bool, default=True)
         parser.add_argument('--warmup_epochs', type=int, default=5)
 
         # Label Smoothing
@@ -156,14 +168,14 @@ class TrainConfig(object):
         return parser
 
     @staticmethod
-    def inference_parser() -> argparse.ArgumentParser:        
+    def inference_parser() -> argparse.ArgumentParser:
         parser = argparse.ArgumentParser("Inference", add_help=False)
         parser.add_argument('--inference_folder', type=str, default='./inference_folder')
         parser.add_argument('--inference_output', type=str, default='./inference_results')
         parser.add_argument('--model_path', type=str, default='')
-        parser.add_argument('--generate_gradcam', type=bool, default=True)
+        parser.add_argument('--generate_gradcam', type=TrainConfig.str2bool, default=True)
         parser.add_argument('--class_names', type=str, nargs='+', default=[f'class_{i}' for i in range(6)])
-        
+
         return parser
 
 

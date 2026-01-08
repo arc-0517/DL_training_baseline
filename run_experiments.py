@@ -9,10 +9,8 @@ MODEL = "efficientnet_b0"
 BATCH_SIZE = 64
 
 # 3. Augmentation 설정
-# 'base'는 기본으로 포함하고, 성능이 가장 좋았던 증강 기법을 아래 리스트에 추가하세요.
-# 예: 'randaugment'가 가장 좋았다면 ['base', 'randaugment']
-BEST_AUGMENTATION = 'mixed'  # <-- 이 부분을 가장 성능이 좋았던 augmentation 이름으로 변경하세요.
-AUGMENTATION_TYPES = ['base', BEST_AUGMENTATION]
+# AUGMENTATION_TYPES = ['base', 'mixed']
+AUGMENTATION_TYPES = ['base']
 
 # 4. Mixup 적용 여부
 MIXUP_OPTIONS = [True, False]
