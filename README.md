@@ -2,7 +2,7 @@
 
 PyTorch를 사용한 피부 질환 분류 모델 학습, 추론, 그리고 ONNX 모델 경량화를 위한 전체 파이프라인입니다.
 
-## 📋 목차
+## 목차
 
 - [프로젝트 개요](#프로젝트-개요)
 - [주요 기능](#주요-기능)
@@ -21,20 +21,20 @@ PyTorch를 사용한 피부 질환 분류 모델 학습, 추론, 그리고 ONNX 
 
 ---
 
-## 🎯 프로젝트 개요
+## 프로젝트 개요
 
 이 프로젝트는 피부 질환 이미지를 분류하는 딥러닝 모델을 쉽게 학습하고 배포할 수 있도록 설계되었습니다.
 
 ### 주요 특징
-- ✅ **다양한 CNN 모델 지원**: EfficientNet, ResNet 등
-- ✅ **재현 가능한 학습**: 동일한 결과를 보장하는 시드 설정
-- ✅ **Grad-CAM 시각화**: 모델 예측 결과를 시각적으로 설명
-- ✅ **ONNX 모델 경량화**: 추론 속도를 7배 이상 향상
-- ✅ **WandB 연동**: 학습 과정 실시간 모니터링
+- **다양한 CNN 모델 지원**: EfficientNet, ResNet 등
+- **재현 가능한 학습**: 동일한 결과를 보장하는 시드 설정
+- **Grad-CAM 시각화**: 모델 예측 결과를 시각적으로 설명
+- **ONNX 모델 경량화**: 추론 속도를 7배 이상 향상
+- **WandB 연동**: 학습 과정 실시간 모니터링
 
 ---
 
-## 🚀 주요 기능
+## 주요 기능
 
 ### 1. 모델 학습
 - 사전 학습된 가중치 활용 (Transfer Learning)
@@ -57,7 +57,7 @@ PyTorch를 사용한 피부 질환 분류 모델 학습, 추론, 그리고 ONNX 
 
 ---
 
-## 📁 폴더 구조
+## 폴더 구조
 
 ```
 baseline_code/
@@ -117,7 +117,7 @@ baseline_code/
 
 ---
 
-## 💻 설치 방법
+## 설치 방법
 
 ### 1. 저장소 클론
 
@@ -157,7 +157,7 @@ pip install -r requirements.txt
 
 ---
 
-## 📖 사용 방법
+## 사용 방법
 
 ### 1. 데이터 준비
 
@@ -367,7 +367,7 @@ python benchmark.py \
 
 ---
 
-## 🤖 지원 모델
+## 지원 모델
 
 ### 분류 모델 (Classification)
 
@@ -378,6 +378,9 @@ python benchmark.py \
 | `efficientnet_b0` | EfficientNet-B0 | 5.3M |
 | `efficientnet_b1` | EfficientNet-B1 | 7.8M |
 | `efficientnet_b2` | EfficientNet-B2 | 9.2M |
+| `mobilenet_v2` | EfficientNet-B0 | 2.2M |
+| `mobilenet_v3_small` | EfficientNet-B1 | 1.5M |
+| `mobilenet_v3_large` | EfficientNet-B2 | 4.2M |
 
 ### 세그멘테이션 모델 (Segmentation)
 
@@ -387,7 +390,7 @@ python benchmark.py \
 
 ---
 
-## 🎓 고급 기능
+## 고급 기능
 
 ### 1. WandB 연동
 
@@ -446,48 +449,8 @@ def build_model(model_name, pre_trained=True, n_class=2):
 
 ---
 
-## ❓ FAQ
 
-### Q1. GPU를 사용할 수 없나요?
-**A:** PyTorch가 CUDA를 지원하도록 설치되어 있고 NVIDIA GPU가 있다면 자동으로 GPU를 사용합니다.
-
-```bash
-# GPU 사용 확인
-python -c "import torch; print(torch.cuda.is_available())"
-```
-
-### Q2. 클래스 개수를 어떻게 설정하나요?
-**A:** `--n_class` 파라미터로 설정합니다. 데이터셋의 하위 폴더 개수와 일치해야 합니다.
-
-```bash
-python main.py --n_class 6  # 6개 클래스
-```
-
-### Q3. 메모리 부족 오류가 발생합니다.
-**A:** 배치 크기를 줄이거나 이미지 크기를 조정하세요.
-
-```bash
-python main.py --batch_size 16 --img_size 192
-```
-
-### Q4. ONNX 변환이 실패합니다.
-**A:** `onnx`와 `onnxruntime` 패키지가 설치되어 있는지 확인하세요.
-
-```bash
-pip install onnx onnxruntime
-```
-
-### Q5. 학습 중에 과적합이 발생합니다.
-**A:** 다음 방법들을 시도해보세요:
-- 데이터 증강 강화
-- Dropout 추가
-- Learning rate 조정
-- Early stopping 활용
-- 정규화 (L2 regularization) 추가
-
----
-
-## 📚 참고 자료
+## 참고 자료
 
 ### 논문
 - **EfficientNet**: [EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks](https://arxiv.org/abs/1905.11946)
@@ -509,23 +472,9 @@ pip install onnx onnxruntime
 
 ---
 
-## 📝 라이선스
 
-이 프로젝트는 교육 목적으로 제공됩니다.
 
----
-
-## 💬 문의사항
-
-문제가 발생하거나 질문이 있으시면 다음을 확인해주세요:
-
-1. 이 README 파일의 FAQ 섹션
-2. `REPRODUCIBILITY.md` 파일 (재현성 관련)
-3. 각 스크립트 파일의 docstring 및 주석
-
----
-
-## 🎉 시작하기
+## 시작하기
 
 ### 빠른 시작 가이드
 
@@ -554,4 +503,3 @@ python benchmark.py \
     --pytorch_model_path save_results/dataset+skin/model+efficientnet_b0/[날짜]
 ```
 
-행복한 딥러닝 하세요! 🚀
