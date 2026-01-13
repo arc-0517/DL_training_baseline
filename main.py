@@ -7,6 +7,7 @@ from configs import TrainConfig
 from dataloaders import make_data_loaders
 from torch_trainer.models import build_model
 from torch_trainer.trainer import Trainer
+from utils.reproducibility import set_seed, set_reproducible_training, print_reproducibility_info
 import wandb
 
 import warnings
@@ -16,8 +17,16 @@ warnings.filterwarnings("ignore")
 def main():
 
     config = TrainConfig.parse_arguments()
-    
-    # 디바이스 정보 출력    
+
+    # 실험 재현성 설정
+    print("\n" + "="*70)
+    print("Setting up reproducibility...")
+    print("="*70)
+    set_seed(config.random_state)
+    worker_init_fn = set_reproducible_training()
+    print_reproducibility_info()
+
+    # 디바이스 정보 출력
     print(f"   PyTorch 버전: {torch.__version__}")
     if torch.cuda.is_available():
         print(f"   CUDA 사용 가능: O (GPU 모드로 학습)")

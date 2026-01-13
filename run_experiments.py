@@ -10,7 +10,7 @@ BATCH_SIZE = 64
 
 # 3. Augmentation 설정
 # AUGMENTATION_TYPES = ['base', 'mixed']
-AUGMENTATION_TYPES = ['base']
+AUGMENTATION_TYPES = ['base', 'color', 'randaugment']
 
 # 4. Mixup 적용 여부
 MIXUP_OPTIONS = [True, False]

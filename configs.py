@@ -138,6 +138,7 @@ class TrainConfig(object):
         parser = argparse.ArgumentParser("Modeling", add_help=False)
         parser.add_argument('--model_name', type=str, default='resnet18',
                           choices=['resnet18', 'resnet50', 'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2',
+                                   'mobilenet_v2', 'mobilenet_v3_small', 'mobilenet_v3_large',
                                    'vit_b_16', 'vit_tiny_patch16_224'])
         parser.add_argument('--pre_trained', type=TrainConfig.str2bool, default=True)
         parser.add_argument('--n_class', type=int, default=6)

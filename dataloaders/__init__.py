@@ -4,8 +4,12 @@ from torchvision import transforms
 import numpy as np
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch
+from utils.reproducibility import get_worker_init_fn
 
 def make_data_loaders(config):
+    # Worker 초기화 함수 생성 (재현성을 위해)
+    worker_init_fn = get_worker_init_fn(config.random_state)
+
     if config.data_name == 'skin':
         train_dataset, valid_dataset = get_skin_datasets(config.data_dir, config.img_size, config.augmentation_type)
 
@@ -14,21 +18,24 @@ def make_data_loaders(config):
                                   shuffle=True,
                                   pin_memory=True,
                                   drop_last=True,
-                                  num_workers=config.num_workers)
+                                  num_workers=config.num_workers,
+                                  worker_init_fn=worker_init_fn)
 
         valid_loader = DataLoader(valid_dataset,
                                   batch_size=config.batch_size,
                                   shuffle=False,
                                   pin_memory=True,
                                   drop_last=False,
-                                  num_workers=config.num_workers)
+                                  num_workers=config.num_workers,
+                                  worker_init_fn=worker_init_fn)
 
         # Use validation set for testing as well
         test_loader = DataLoader(valid_dataset,
                                  batch_size=config.test_batch_size,
                                  shuffle=False,
                                  pin_memory=True,
-                                 num_workers=config.num_workers)
+                                 num_workers=config.num_workers,
+                                 worker_init_fn=worker_init_fn)
                                  
         # Attach a simple method to the loader to get class names
         def get_class_names_func():
@@ -57,18 +64,21 @@ def make_data_loaders(config):
                                   sampler=train_sampler,
                                   pin_memory=True,
                                   drop_last=True,
-                                  num_workers=config.num_workers)
+                                  num_workers=config.num_workers,
+                                  worker_init_fn=worker_init_fn)
 
         valid_loader = DataLoader(trainset,
                                   batch_size=config.batch_size,
                                   sampler=valid_sampler,
                                   pin_memory=True,
                                   drop_last=True,
-                                  num_workers=config.num_workers)
+                                  num_workers=config.num_workers,
+                                  worker_init_fn=worker_init_fn)
 
         test_loader = DataLoader(testset,
                                  batch_size=config.test_batch_size,
                                  pin_memory=True,
-                                 num_workers=config.num_workers)
+                                 num_workers=config.num_workers,
+                                 worker_init_fn=worker_init_fn)
 
     return train_loader, valid_loader, test_loader
