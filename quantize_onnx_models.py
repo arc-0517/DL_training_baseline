@@ -113,7 +113,7 @@ def convert_classification_model(args, device, results):
         dummy_input,
         onnx_path,
         export_params=True,
-        opset_version=14,
+        opset_version=18,  # opset 18로 업그레이드하여 최신 ONNX 기능 활용
         do_constant_folding=True,  # 상수 폴딩으로 그래프 최적화
         input_names=['input'],
         output_names=['output'],
@@ -177,7 +177,7 @@ def convert_segmentation_model(args, device, results):
             dummy_input,
             onnx_path,
             export_params=True,
-            opset_version=14,
+            opset_version=18,  # opset 18로 업그레이드하여 최신 ONNX 기능 활용
             do_constant_folding=True,  # 상수 폴딩으로 그래프 최적화
             input_names=['pixel_values'],
             output_names=['logits'],

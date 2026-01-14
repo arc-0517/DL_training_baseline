@@ -267,8 +267,11 @@ def benchmark_onnx_models(args, config, device, results):
 
     onnx_models = {
         "분류 모델": "clf_model.onnx",
-        "세그멘테이션 모델": "seg_model.onnx"
     }
+
+    # skip_segmentation 플래그 확인하여 세그멘테이션 모델 추가
+    if not args.skip_segmentation:
+        onnx_models["세그멘테이션 모델"] = "seg_model.onnx"
 
     # 입력 데이터 준비
     clf_input_np = np.random.randn(1, 3, config['img_size'], config['img_size']).astype(np.float32)
