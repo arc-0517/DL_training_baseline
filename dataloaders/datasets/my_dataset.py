@@ -51,20 +51,41 @@ def get_transforms(augmentation_type, img_size):
     return transforms.Compose(aug_specific_transforms + base_transforms)
 
 
-def get_skin_datasets(data_dir, img_size, augmentation_type='mixed'):
+from torch.utils.data import Subset
+
+def get_skin_datasets(data_dir, img_size, augmentation_type='mixed', valid_ratio=0.2, random_state=42, shuffle=True):
     """
-    Returns training and validation datasets for the skin dataset.
+    Returns training and validation datasets for the skin dataset by splitting the training data.
     """
     train_transform = get_transforms(augmentation_type, img_size)
     val_transform = get_transforms('base', img_size)
 
-    train_dataset_path = os.path.join(data_dir, 'skin_dataset', 'Training')
-    val_dataset_path = os.path.join(data_dir, 'skin_dataset', 'Validation', '01.원천데이터')
+    # Create two dataset instances from the same training folder, one with augmentation and one without
+    train_path = os.path.join(data_dir, 'skin_dataset', 'Training')
+    
+    train_dataset_with_aug = ImageFolder(root=train_path, transform=train_transform)
+    val_dataset_no_aug = ImageFolder(root=train_path, transform=val_transform)
 
-    train_dataset = ImageFolder(root=train_dataset_path, transform=train_transform)
-    val_dataset = ImageFolder(root=val_dataset_path, transform=val_transform)
+    # Splitting the dataset into training and validation
+    dataset_size = len(train_dataset_with_aug)
+    indices = list(range(dataset_size))
+    split = int(np.floor(valid_ratio * dataset_size))
 
-    return train_dataset, val_dataset
+    if shuffle:
+        np.random.seed(random_state)
+        np.random.shuffle(indices)
+
+    train_indices, val_indices = indices[split:], indices[:split]
+
+    # Create subsets for train and validation
+    train_subset = Subset(train_dataset_with_aug, train_indices)
+    val_subset = Subset(val_dataset_no_aug, val_indices)
+    
+    # Attach class names to subsets for later use
+    train_subset.classes = train_dataset_with_aug.classes
+    val_subset.classes = val_dataset_no_aug.classes
+
+    return train_subset, val_subset
 
 class DL_dataset(Dataset):
     def __init__(self, dataroot: str, dataname: str, split: str, img_size: int = 224, augmentation_type: str = 'mixed'):
