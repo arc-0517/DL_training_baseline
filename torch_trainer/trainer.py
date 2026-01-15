@@ -153,12 +153,13 @@ class Trainer(object):
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
-            total_num += data_loader.batch_size
-            total_loss += loss.item() * data_loader.batch_size
-            
+            batch_size = inputs.size(0)
+            total_num += batch_size
+            total_loss += loss.item() * batch_size
+
             device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
             train_bar.set_description(f'Train Epoch (Standard): [{epoch}/{self.epochs}] [{device_info}], lr: {self.get_lr(self.optimizer):.6f}, Loss: {total_loss / total_num:.4f}')
-        
+
         if self.config.wandb:
             wandb.log({"train_loss": total_loss / total_num}, step=epoch)
         return total_loss / total_num
@@ -179,8 +180,9 @@ class Trainer(object):
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
-            total_num += data_loader.batch_size
-            total_loss += loss.item() * data_loader.batch_size
+            batch_size = inputs.size(0)
+            total_num += batch_size
+            total_loss += loss.item() * batch_size
 
             device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
             train_bar.set_description(f'Train Epoch (Mixup): [{epoch}/{self.epochs}] [{device_info}], lr: {self.get_lr(self.optimizer):.6f}, Loss: {total_loss / total_num:.4f}')
@@ -208,12 +210,13 @@ class Trainer(object):
             _, predicted = torch.max(pred.data, 1)
             pred_list.extend(predicted.cpu().numpy())
             label_list.extend(targets.cpu().numpy())
-            total_num += data_loader.batch_size
-            total_loss += loss.item() * data_loader.batch_size
+            batch_size = inputs.size(0)
+            total_num += batch_size
+            total_loss += loss.item() * batch_size
             valid_acc = accuracy_score(label_list, pred_list)
             device_info = "CPU" if self.device == "cpu" else f"GPU-{self.device}"
             valid_bar.set_description(f'Valid Epoch: [{epoch}/{self.epochs}] [{device_info}], Loss: {total_loss / total_num:.4f}, Acc: {valid_acc:.3f}')
-        
+
         if self.config.wandb:
             wandb.log({"valid_loss": total_loss / total_num, "valid_acc": valid_acc}, step=epoch)
 

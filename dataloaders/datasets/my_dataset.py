@@ -52,40 +52,113 @@ def get_transforms(augmentation_type, img_size):
 
 
 from torch.utils.data import Subset
+from sklearn.model_selection import train_test_split
 
-def get_skin_datasets(data_dir, img_size, augmentation_type='mixed', valid_ratio=0.2, random_state=42, shuffle=True):
+# Class labels - order must match folder names in both Training and Validation
+LABELS = ['seborrheic', 'rosacea', 'normal', 'acne', 'atopic', 'psoriasis']
+
+class SkinDataset(Dataset):
+    """Custom dataset for skin condition classification with new folder structure."""
+
+    def __init__(self, data_dir, split='train', transform=None):
+        """
+        Args:
+            data_dir: Root directory containing skin_dataset folder
+            split: 'train' or 'val'
+            transform: torchvision transforms to apply
+        """
+        self.data_dir = data_dir
+        self.split = split
+        self.transform = transform
+        self.samples = []
+        self.classes = LABELS
+
+        # Determine folder path based on split
+        if split == 'train':
+            base_path = os.path.join(data_dir, 'skin_dataset', 'Training', '01.원천 데이터')
+        else:  # val
+            base_path = os.path.join(data_dir, 'skin_dataset', 'Validation', '01.원천데이터')
+
+        # Load all image paths and labels directly from folder names
+        for label_idx, label_name in enumerate(LABELS):
+            folder_path = os.path.join(base_path, label_name)
+
+            # Check if folder exists
+            if not os.path.exists(folder_path):
+                print(f"Warning: Folder not found: {folder_path}")
+                continue
+
+            # Find all image files
+            for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']:
+                image_files = glob.glob(os.path.join(folder_path, ext))
+                for img_path in image_files:
+                    self.samples.append((img_path, label_idx))
+
+        if len(self.samples) == 0:
+            raise RuntimeError(f"Found 0 images in {base_path}")
+
+        print(f"Loaded {len(self.samples)} images for {split} split")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        img_path, label = self.samples[idx]
+
+        # Load image
+        image = Image.open(img_path).convert('RGB')
+
+        # Apply transforms
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label
+
+    def get_class_names(self):
+        """Return class names"""
+        return self.classes
+
+def get_skin_datasets(data_dir, img_size, augmentation_type='mixed', valid_ratio=0.2, random_state=42):
     """
-    Returns training and validation datasets for the skin dataset by splitting the training data.
+    Returns training and validation datasets for the skin dataset.
+    Loads data from Training folder and splits it into train/val with fixed random seed.
+
+    Args:
+        data_dir: Root directory containing skin_dataset folder
+        img_size: Image size for transforms
+        augmentation_type: Type of data augmentation for training
+        valid_ratio: Ratio of validation data (default: 0.2)
+        random_state: Random seed for reproducible split (default: 42)
     """
     train_transform = get_transforms(augmentation_type, img_size)
     val_transform = get_transforms('base', img_size)
 
-    # Create two dataset instances from the same training folder, one with augmentation and one without
-    train_path = os.path.join(data_dir, 'skin_dataset', 'Training')
-    
-    train_dataset_with_aug = ImageFolder(root=train_path, transform=train_transform)
-    val_dataset_no_aug = ImageFolder(root=train_path, transform=val_transform)
+    # Load all data from Training folder (without transform first)
+    full_dataset = SkinDataset(data_dir=data_dir, split='train', transform=None)
 
-    # Splitting the dataset into training and validation
-    dataset_size = len(train_dataset_with_aug)
-    indices = list(range(dataset_size))
-    split = int(np.floor(valid_ratio * dataset_size))
+    # Get all sample indices
+    indices = list(range(len(full_dataset)))
 
-    if shuffle:
-        np.random.seed(random_state)
-        np.random.shuffle(indices)
+    # Get labels for stratified split
+    labels = [label for _, label in full_dataset.samples]
 
-    train_indices, val_indices = indices[split:], indices[:split]
+    # Perform stratified train/val split with fixed random seed
+    train_indices, val_indices = train_test_split(
+        indices,
+        test_size=valid_ratio,
+        random_state=random_state,
+        stratify=labels  # Ensure balanced class distribution
+    )
 
-    # Create subsets for train and validation
-    train_subset = Subset(train_dataset_with_aug, train_indices)
-    val_subset = Subset(val_dataset_no_aug, val_indices)
-    
-    # Attach class names to subsets for later use
-    train_subset.classes = train_dataset_with_aug.classes
-    val_subset.classes = val_dataset_no_aug.classes
+    # Create train dataset with augmentation
+    train_dataset = SkinDataset(data_dir=data_dir, split='train', transform=train_transform)
+    train_dataset.samples = [full_dataset.samples[i] for i in train_indices]
 
-    return train_subset, val_subset
+    # Create validation dataset without augmentation
+    val_dataset = SkinDataset(data_dir=data_dir, split='train', transform=val_transform)
+    val_dataset.samples = [full_dataset.samples[i] for i in val_indices]
+
+    return train_dataset, val_dataset
 
 class DL_dataset(Dataset):
     def __init__(self, dataroot: str, dataname: str, split: str, img_size: int = 224, augmentation_type: str = 'mixed'):

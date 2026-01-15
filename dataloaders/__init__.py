@@ -1,19 +1,11 @@
-from dataloaders.datasets.my_dataset import DL_dataset, get_skin_datasets
-from torch.utils.data import DataLoader
-from torchvision import transforms
-import numpy as np
-from torch.utils.data.sampler import SubsetRandomSampler
-import torch
-from utils.reproducibility import get_worker_init_fn
-
 import os
-from torchvision.datasets import ImageFolder
-from dataloaders.datasets.my_dataset import DL_dataset, get_skin_datasets, get_transforms
-from torch.utils.data import DataLoader
-from torchvision import transforms
 import numpy as np
-from torch.utils.data.sampler import SubsetRandomSampler
 import torch
+from torch.utils.data import DataLoader
+from torch.utils.data.sampler import SubsetRandomSampler
+from torchvision import transforms
+
+from dataloaders.datasets.my_dataset import DL_dataset, get_skin_datasets, SkinDataset, get_transforms
 from utils.reproducibility import get_worker_init_fn
 
 def make_data_loaders(config):
@@ -26,8 +18,7 @@ def make_data_loaders(config):
             img_size=config.img_size,
             augmentation_type=config.augmentation_type,
             valid_ratio=config.valid_ratio,
-            random_state=config.random_state,
-            shuffle=config.shuffle_dataset
+            random_state=config.random_state
         )
 
         train_loader = DataLoader(train_dataset,
@@ -46,22 +37,16 @@ def make_data_loaders(config):
                                   num_workers=config.num_workers,
                                   worker_init_fn=worker_init_fn)
 
-        # Create a separate test dataset from the validation folder
+        # Create test dataset from separate Validation folder
         test_transform = get_transforms('base', config.img_size)
-        test_dataset_path = os.path.join(config.data_dir, 'skin_dataset', 'Validation', '01.원천데이터')
-        test_dataset = ImageFolder(root=test_dataset_path, transform=test_transform)
-        
+        test_dataset = SkinDataset(data_dir=config.data_dir, split='val', transform=test_transform)
+
         test_loader = DataLoader(test_dataset,
                                  batch_size=config.test_batch_size,
                                  shuffle=False,
                                  pin_memory=True,
                                  num_workers=config.num_workers,
                                  worker_init_fn=worker_init_fn)
-                                 
-        # Attach a simple method to the loader to get class names
-        def get_class_names_func():
-            return train_dataset.classes
-        train_loader.dataset.get_class_names = get_class_names_func
 
     else: # existing dogcat logic
         trainset = DL_dataset(dataroot=config.data_dir, dataname=config.data_name, split='train', augmentation_type=config.augmentation_type)

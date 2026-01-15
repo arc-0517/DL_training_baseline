@@ -23,6 +23,7 @@ LEARNING_RATE = 0.001
 EPOCHS = 2
 DATA_NAME = "skin"
 WANDB_PROJECT = "skin_exp_efficientnet_b0_test"
+RANDOM_STATE = 42  # 재현성을 위한 seed
 
 # --- 스크립트 본체 ---
 
@@ -58,6 +59,7 @@ def main():
             "--augmentation_type", aug_type,
             "--use_mixup", str(use_mixup),
             "--use_focal_loss", str(use_focal_loss),
+            "--random_state", str(RANDOM_STATE),
             "--wandb_name_tags", "model_name", "augmentation_type", "use_mixup", "use_focal_loss"
         ]
         

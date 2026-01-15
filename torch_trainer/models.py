@@ -1,43 +1,55 @@
 from torchvision import models
+from torchvision.models import (
+    ResNet18_Weights, ResNet50_Weights,
+    EfficientNet_B0_Weights, EfficientNet_B1_Weights, EfficientNet_B2_Weights,
+    MobileNet_V2_Weights, MobileNet_V3_Small_Weights, MobileNet_V3_Large_Weights
+)
 import torch.nn as nn
 import timm
 
 def build_model(model_name: str, pre_trained: bool, n_class: int):
 
     if model_name == "resnet18":
-        model = models.resnet18(pretrained=pre_trained)
+        weights = ResNet18_Weights.IMAGENET1K_V1 if pre_trained else None
+        model = models.resnet18(weights=weights)
         model.fc = nn.Linear(model.fc.in_features, n_class)
     elif model_name == "resnet50":
-        model = models.resnet50(pretrained=pre_trained)
+        weights = ResNet50_Weights.IMAGENET1K_V1 if pre_trained else None
+        model = models.resnet50(weights=weights)
         model.fc = nn.Linear(model.fc.in_features, n_class)
     elif model_name == "efficientnet_b0":
-        model = models.efficientnet_b0(pretrained=pre_trained)
+        weights = EfficientNet_B0_Weights.IMAGENET1K_V1 if pre_trained else None
+        model = models.efficientnet_b0(weights=weights)
         model.classifier = nn.Sequential(
             nn.Dropout(p=0.2),
             nn.Linear(model.classifier[1].in_features, n_class)
         )
     elif model_name == "efficientnet_b1":
-        model = models.efficientnet_b1(pretrained=pre_trained)
+        weights = EfficientNet_B1_Weights.IMAGENET1K_V1 if pre_trained else None
+        model = models.efficientnet_b1(weights=weights)
         model.classifier = nn.Sequential(
             nn.Dropout(p=0.2),
             nn.Linear(model.classifier[1].in_features, n_class)
         )
     elif model_name == "efficientnet_b2":
-        model = models.efficientnet_b2(pretrained=pre_trained)
+        weights = EfficientNet_B2_Weights.IMAGENET1K_V1 if pre_trained else None
+        model = models.efficientnet_b2(weights=weights)
         model.classifier = nn.Sequential(
             nn.Dropout(p=0.2),
             nn.Linear(model.classifier[1].in_features, n_class)
         )
     # MobileNet V2
     elif model_name == "mobilenet_v2":
-        model = models.mobilenet_v2(pretrained=pre_trained)
+        weights = MobileNet_V2_Weights.IMAGENET1K_V1 if pre_trained else None
+        model = models.mobilenet_v2(weights=weights)
         model.classifier = nn.Sequential(
             nn.Dropout(p=0.2),
             nn.Linear(model.classifier[1].in_features, n_class)
         )
     # MobileNet V3 Small (가장 경량)
     elif model_name == "mobilenet_v3_small":
-        model = models.mobilenet_v3_small(pretrained=pre_trained)
+        weights = MobileNet_V3_Small_Weights.IMAGENET1K_V1 if pre_trained else None
+        model = models.mobilenet_v3_small(weights=weights)
         model.classifier = nn.Sequential(
             nn.Linear(model.classifier[0].in_features, model.classifier[0].out_features),
             nn.Hardswish(),
@@ -46,7 +58,8 @@ def build_model(model_name: str, pre_trained: bool, n_class: int):
         )
     # MobileNet V3 Large (V3 중 가장 큼)
     elif model_name == "mobilenet_v3_large":
-        model = models.mobilenet_v3_large(pretrained=pre_trained)
+        weights = MobileNet_V3_Large_Weights.IMAGENET1K_V1 if pre_trained else None
+        model = models.mobilenet_v3_large(weights=weights)
         model.classifier = nn.Sequential(
             nn.Linear(model.classifier[0].in_features, model.classifier[0].out_features),
             nn.Hardswish(),

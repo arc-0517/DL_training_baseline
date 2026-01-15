@@ -149,7 +149,7 @@ class TrainConfig(object):
         parser.add_argument('--weight_decay', type=float, default=1e-4)
         parser.add_argument('--epochs', type=int, default=50)
         parser.add_argument('--local_rank', type=int, default=0)
-        parser.add_argument('--early_stopping_patience', type=int, default=10)
+        parser.add_argument('--early_stopping_patience', type=int, default=20)
         parser.add_argument('--early_stopping_metric', type=str, default='valid_loss')
         parser.add_argument('--use_amp', type=TrainConfig.str2bool, default=True)
 
@@ -175,7 +175,8 @@ class TrainConfig(object):
         parser.add_argument('--inference_output', type=str, default='./inference_results')
         parser.add_argument('--model_path', type=str, default='')
         parser.add_argument('--generate_gradcam', type=TrainConfig.str2bool, default=True)
-        parser.add_argument('--class_names', type=str, nargs='+', default=[f'class_{i}' for i in range(6)])
+        parser.add_argument('--class_names', type=str, nargs='+',
+                          default=['seborrheic', 'rosacea', 'normal', 'acne', 'atopic', 'psoriasis'])
 
         return parser
 
@@ -187,7 +188,7 @@ class InferenceConfig(object):
         self.inference_output = './inference_results'
         self.model_path = ''
         self.generate_gradcam = True
-        self.class_names = ['negative', 'positive']
+        self.class_names = ['seborrheic', 'rosacea', 'normal', 'acne', 'atopic', 'psoriasis']
         self.img_size = 224
         self.batch_size = 16
         
