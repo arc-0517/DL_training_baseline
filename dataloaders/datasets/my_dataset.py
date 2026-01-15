@@ -75,7 +75,7 @@ class SkinDataset(Dataset):
 
         # Determine folder path based on split
         if split == 'train':
-            base_path = os.path.join(data_dir, 'skin_dataset', 'Training', '01.원천 데이터')
+            base_path = os.path.join(data_dir, 'skin_dataset', 'Training', '01.원천데이터')
         else:  # val
             base_path = os.path.join(data_dir, 'skin_dataset', 'Validation', '01.원천데이터')
 
