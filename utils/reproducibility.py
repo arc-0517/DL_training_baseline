@@ -42,16 +42,23 @@ def set_seed(seed=0):
     print(f"[OK] Deterministic mode enabled")
 
 
-def set_reproducible_training():
+def set_reproducible_training(strict=True):
     """
     PyTorch 학습의 재현성을 최대한 보장하도록 설정합니다.
 
-    주의: 일부 연산(예: atomic operations)은 여전히 비결정적일 수 있습니다.
+    Args:
+        strict (bool): True면 비결정적 연산 시 에러 발생, False면 경고만 출력
+
+    주의: 일부 연산(예: atomic operations, bicubic upsampling)은 비결정적일 수 있습니다.
     """
     # PyTorch 결정론적 알고리즘 사용 (PyTorch 1.8+)
     try:
-        torch.use_deterministic_algorithms(True)
-        print("[OK] Using deterministic algorithms")
+        torch.use_deterministic_algorithms(strict)
+        if strict:
+            print("[OK] Using deterministic algorithms (strict mode)")
+        else:
+            print("[OK] Using deterministic algorithms (warn_only=True)")
+
     except AttributeError:
         # PyTorch 버전이 낮은 경우
         print("[WARNING] torch.use_deterministic_algorithms not available (requires PyTorch 1.8+)")

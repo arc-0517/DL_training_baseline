@@ -55,23 +55,34 @@ from torch.utils.data import Subset
 from sklearn.model_selection import train_test_split
 
 # Class labels - order must match folder names in both Training and Validation
-LABELS = ['seborrheic', 'rosacea', 'normal', 'acne', 'atopic', 'psoriasis']
+ALL_LABELS = ['seborrheic', 'rosacea', 'normal', 'acne', 'atopic', 'psoriasis']
+LABELS = ALL_LABELS  # 하위 호환성을 위해 유지
 
 class SkinDataset(Dataset):
     """Custom dataset for skin condition classification with new folder structure."""
 
-    def __init__(self, data_dir, split='train', transform=None):
+    def __init__(self, data_dir, split='train', transform=None, selected_labels=None):
         """
         Args:
             data_dir: Root directory containing skin_dataset folder
             split: 'train' or 'val'
             transform: torchvision transforms to apply
+            selected_labels: List of label names to include (None = all labels)
         """
         self.data_dir = data_dir
         self.split = split
         self.transform = transform
         self.samples = []
-        self.classes = LABELS
+
+        # 선택된 레이블 설정 (None이면 전체 레이블 사용)
+        if selected_labels is None:
+            self.classes = ALL_LABELS
+        else:
+            # 선택된 레이블만 사용 (순서 유지)
+            self.classes = [label for label in ALL_LABELS if label in selected_labels]
+            if len(self.classes) == 0:
+                raise ValueError(f"No valid labels found in selected_labels: {selected_labels}")
+            print(f"Using selected labels: {self.classes}")
 
         # Determine folder path based on split
         if split == 'train':
@@ -80,7 +91,8 @@ class SkinDataset(Dataset):
             base_path = os.path.join(data_dir, 'skin_dataset', 'Validation', '01.원천데이터')
 
         # Load all image paths and labels directly from folder names
-        for label_idx, label_name in enumerate(LABELS):
+        # 새로운 인덱스를 사용하여 선택된 레이블에 맞게 매핑
+        for label_idx, label_name in enumerate(self.classes):
             folder_path = os.path.join(base_path, label_name)
 
             # Check if folder exists
@@ -97,7 +109,7 @@ class SkinDataset(Dataset):
         if len(self.samples) == 0:
             raise RuntimeError(f"Found 0 images in {base_path}")
 
-        print(f"Loaded {len(self.samples)} images for {split} split")
+        print(f"Loaded {len(self.samples)} images for {split} split (classes: {self.classes})")
 
     def __len__(self):
         return len(self.samples)
@@ -118,7 +130,7 @@ class SkinDataset(Dataset):
         """Return class names"""
         return self.classes
 
-def get_skin_datasets(data_dir, img_size, augmentation_type='mixed', valid_ratio=0.2, random_state=42):
+def get_skin_datasets(data_dir, img_size, augmentation_type='mixed', valid_ratio=0.2, random_state=42, selected_labels=None):
     """
     Returns training and validation datasets for the skin dataset.
     Loads data from Training folder and splits it into train/val with fixed random seed.
@@ -129,12 +141,13 @@ def get_skin_datasets(data_dir, img_size, augmentation_type='mixed', valid_ratio
         augmentation_type: Type of data augmentation for training
         valid_ratio: Ratio of validation data (default: 0.2)
         random_state: Random seed for reproducible split (default: 42)
+        selected_labels: List of label names to include (None = all labels)
     """
     train_transform = get_transforms(augmentation_type, img_size)
     val_transform = get_transforms('base', img_size)
 
     # Load all data from Training folder (without transform first)
-    full_dataset = SkinDataset(data_dir=data_dir, split='train', transform=None)
+    full_dataset = SkinDataset(data_dir=data_dir, split='train', transform=None, selected_labels=selected_labels)
 
     # Get all sample indices
     indices = list(range(len(full_dataset)))
@@ -151,11 +164,11 @@ def get_skin_datasets(data_dir, img_size, augmentation_type='mixed', valid_ratio
     )
 
     # Create train dataset with augmentation
-    train_dataset = SkinDataset(data_dir=data_dir, split='train', transform=train_transform)
+    train_dataset = SkinDataset(data_dir=data_dir, split='train', transform=train_transform, selected_labels=selected_labels)
     train_dataset.samples = [full_dataset.samples[i] for i in train_indices]
 
     # Create validation dataset without augmentation
-    val_dataset = SkinDataset(data_dir=data_dir, split='train', transform=val_transform)
+    val_dataset = SkinDataset(data_dir=data_dir, split='train', transform=val_transform, selected_labels=selected_labels)
     val_dataset.samples = [full_dataset.samples[i] for i in val_indices]
 
     return train_dataset, val_dataset

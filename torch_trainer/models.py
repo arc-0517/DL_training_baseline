@@ -4,10 +4,13 @@ from torchvision.models import (
     EfficientNet_B0_Weights, EfficientNet_B1_Weights, EfficientNet_B2_Weights,
     MobileNet_V2_Weights, MobileNet_V3_Small_Weights, MobileNet_V3_Large_Weights
 )
+import torch
 import torch.nn as nn
 import timm
 
-def build_model(model_name: str, pre_trained: bool, n_class: int):
+
+def build_model(model_name: str, pre_trained: bool, n_class: int,
+                freeze_backbone: bool = False, unfreeze_last_n_blocks: int = 0):
 
     if model_name == "resnet18":
         weights = ResNet18_Weights.IMAGENET1K_V1 if pre_trained else None

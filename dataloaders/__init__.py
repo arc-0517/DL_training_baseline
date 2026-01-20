@@ -13,12 +13,16 @@ def make_data_loaders(config):
     worker_init_fn = get_worker_init_fn(config.random_state)
 
     if config.data_name == 'skin':
+        # selected_labels 설정 가져오기 (없으면 None = 전체 레이블 사용)
+        selected_labels = getattr(config, 'selected_labels', None)
+
         train_dataset, valid_dataset = get_skin_datasets(
             data_dir=config.data_dir,
             img_size=config.img_size,
             augmentation_type=config.augmentation_type,
             valid_ratio=config.valid_ratio,
-            random_state=config.random_state
+            random_state=config.random_state,
+            selected_labels=selected_labels
         )
 
         train_loader = DataLoader(train_dataset,
@@ -39,7 +43,7 @@ def make_data_loaders(config):
 
         # Create test dataset from separate Validation folder
         test_transform = get_transforms('base', config.img_size)
-        test_dataset = SkinDataset(data_dir=config.data_dir, split='val', transform=test_transform)
+        test_dataset = SkinDataset(data_dir=config.data_dir, split='val', transform=test_transform, selected_labels=selected_labels)
 
         test_loader = DataLoader(test_dataset,
                                  batch_size=config.test_batch_size,

@@ -130,6 +130,9 @@ class TrainConfig(object):
         parser.add_argument('--augmentation_type', type=str, default='mixed',
                           choices=['base', 'geometric', 'color', 'mixed', 'randaugment', 'autoaugment'])
         parser.add_argument('--num_workers', type=int, default=min(os.cpu_count(), 4))
+        # 학습에 사용할 레이블 선택 (None이면 전체 레이블 사용)
+        parser.add_argument('--selected_labels', type=str, nargs='+', default=None,
+                          help='Labels to use for training/validation. If not specified, all labels are used.')
 
         return parser
 

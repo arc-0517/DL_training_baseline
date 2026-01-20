@@ -61,7 +61,9 @@ def main():
     # Define model & trainer
     model = build_model(model_name=config.model_name,
                         pre_trained=config.pre_trained,
-                        n_class=config.n_class)
+                        n_class=config.n_class,
+                        freeze_backbone=getattr(config, 'freeze_backbone', False),
+                        unfreeze_last_n_blocks=getattr(config, 'unfreeze_last_n_blocks', 0))
 
     trainer = Trainer(model=model, config=config)
     trainer.compile(ckpt_dir=config.checkpoint_dir,
